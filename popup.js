@@ -1,64 +1,88 @@
 const toggleButton = document.getElementById('toggleDarkMode');
 
-// Load saved state on popup open
-chrome.storage.local.get('darkModeEnabled', (data) => {
-  updateButtonState(data.darkModeEnabled || false);
-});
+// Initialize with default state
+let darkModeEnabled = false;
 
-// Handle button click
+// Safe storage access with fallback
+function getStorage() {
+  return new Promise((resolve) => {
+    if (chrome.storage && chrome.storage.local) {
+      chrome.storage.local.get('darkModeEnabled', (data) => {
+        resolve(data.darkModeEnabled || false);
+      });
+    } else {
+      console.warn("Storage API not available, using default state");
+      resolve(false);
+    }
+  });
+}
+
+// Main initialization
+async function init() {
+  try {
+    darkModeEnabled = await getStorage();
+    updateButtonState(darkModeEnabled);
+  } catch (error) {
+    console.error("Initialization error:", error);
+    updateButtonState(false);
+  }
+}
+
+// Button click handler
 toggleButton.addEventListener('click', async () => {
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  toggleDarkMode(tab.id);
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    darkModeEnabled = !darkModeEnabled;
+    
+    // Save state if storage is available
+    if (chrome.storage?.local) {
+      await chrome.storage.local.set({ darkModeEnabled });
+    }
+    
+    updateButtonState(darkModeEnabled);
+    
+    await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      function: enforceDarkMode,
+      args: [darkModeEnabled]
+    });
+  } catch (error) {
+    console.error("Toggle error:", error);
+  }
 });
 
 // Handle keyboard shortcut
-chrome.commands.onCommand.addListener((command) => {
+chrome.commands?.onCommand?.addListener((command) => {
   if (command === 'toggle-dark-mode') {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       if (tabs[0]) {
-        toggleDarkMode(tabs[0].id);
+        toggleButton.click(); // Trigger the button click handler
       }
     });
   }
 });
 
-async function toggleDarkMode(tabId) {
-  const data = await chrome.storage.local.get('darkModeEnabled');
-  const darkModeEnabled = !data.darkModeEnabled;
-  
-  // Save the new state
-  await chrome.storage.local.set({ darkModeEnabled });
-  
-  // Update button text
-  updateButtonState(darkModeEnabled);
-  
-  // Apply/remove dark mode
-  await chrome.scripting.executeScript({
-    target: { tabId },
-    function: enforceDarkMode,
-    args: [darkModeEnabled]
-  });
+function updateButtonState(isEnabled) {
+  toggleButton.textContent = isEnabled ? 'Disable Dark Mode' : 'Enable Dark Mode';
+  toggleButton.style.backgroundColor = isEnabled ? '#4CAF50' : '#333';
 }
 
-function updateButtonState(darkModeEnabled) {
-  toggleButton.textContent = darkModeEnabled ? 'Disable Dark Mode' : 'Enable Dark Mode';
-  toggleButton.style.backgroundColor = darkModeEnabled ? '#4CAF50' : '#333';
-}
-
-function enforceDarkMode(darkModeEnabled) {
-  // Apply to body
-  document.body.style.filter = darkModeEnabled 
-    ? 'invert(1) hue-rotate(180deg)' 
-    : 'none';
-  
-  // Handle media elements separately
-  const mediaElements = document.querySelectorAll('img, video, picture, svg, iframe');
-  mediaElements.forEach(el => {
-    el.style.filter = darkModeEnabled ? 'invert(1) hue-rotate(180deg)' : 'none';
-  });
-  
-  // Adjust background for better contrast
-  if (darkModeEnabled) {
-    document.body.style.backgroundColor = '#121212';
+function enforceDarkMode(shouldEnable) {
+  try {
+    // Apply to body
+    document.body.style.filter = shouldEnable 
+      ? 'invert(1) hue-rotate(180deg)' 
+      : 'none';
+    
+    // Handle media elements
+    const mediaElements = document.querySelectorAll('img, video, picture, svg');
+    mediaElements.forEach(el => {
+      el.style.filter = shouldEnable ? 'invert(1) hue-rotate(180deg)' : 'none';
+    });
+  } catch (error) {
+    console.error("Content script error:", error);
   }
 }
+
+// Start the extension
+init();
