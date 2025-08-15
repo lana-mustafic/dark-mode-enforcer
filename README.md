@@ -31,7 +31,6 @@ A lightweight Chrome extension that forces dark mode on any website with intelli
 - Chrome Extension Manifest V3
 - JavaScript (ES6+)
 - Chrome Storage API (sync + local fallback)
-- 
 
 ## 📜 License
 MIT © Lana Mustafić (https://github.com/lana-mustafic)
