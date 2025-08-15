@@ -33,4 +33,4 @@ A lightweight Chrome extension that forces dark mode on any website with intelli
 - Chrome Storage API (sync + local fallback)
 
 ## 📜 License
-MIT © Lana Mustafić(https://github.com/lana-mustafic)
+MIT © MIT © [Lana Mustafić](https://github.com/lana-mustafic)
